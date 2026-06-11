@@ -77,11 +77,40 @@ class ClipboardManager {
       readStream.on('data', (chunk) => {
         const base64Chunk = chunk.toString('base64');
         const chunkMsg = JSON.stringify({ type: 'file-chunk', filename, data: base64Chunk });
-        this.webrtcManager.broadcastFileMessage(chunkMsg);
+        
+        let shouldPause = false;
+        
+        // Broadcast manually so we can check bufferedAmount
+        for (const id in this.webrtcManager.peers) {
+            const peer = this.webrtcManager.peers[id];
+            if (peer.fileChannel && peer.fileChannel.isOpen()) {
+                peer.fileChannel.sendMessage(chunkMsg);
+                if (peer.fileChannel.bufferedAmount() > 5 * 1024 * 1024) { // If buffer > 5MB, pause
+                    shouldPause = true;
+                }
+            }
+        }
         
         bytesSent += chunk.length;
         const progress = Math.round((bytesSent / totalSize) * 100);
         this.localSocket.emit('transfer-status', { type: 'sending', filename, progress });
+        
+        if (shouldPause) {
+            readStream.pause();
+            const checkBuffer = setInterval(() => {
+                let canResume = true;
+                for (const id in this.webrtcManager.peers) {
+                    const peer = this.webrtcManager.peers[id];
+                    if (peer.fileChannel && peer.fileChannel.isOpen() && peer.fileChannel.bufferedAmount() > 1024 * 1024) {
+                        canResume = false;
+                    }
+                }
+                if (canResume) {
+                    clearInterval(checkBuffer);
+                    readStream.resume();
+                }
+            }, 50);
+        }
       });
 
       readStream.on('end', () => {

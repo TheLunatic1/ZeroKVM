@@ -1,5 +1,19 @@
-const { exec } = require('child_process');
+const { UiohookKey } = require('uiohook-napi');
+const { Key } = require('@nut-tree-fork/nut-js');
 
-exec('powershell.exe -command "Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SystemInformation]::VirtualScreen"', (err, stdout) => {
-  console.log('VirtualScreen:', stdout);
-});
+const mapped = {};
+const unmapped = [];
+
+for (const [keyName, uioValue] of Object.entries(UiohookKey)) {
+    if (Key[keyName] !== undefined) {
+        mapped[uioValue] = Key[keyName];
+    } else {
+        const upper = keyName.toUpperCase();
+        if (Key[upper] !== undefined) {
+            mapped[uioValue] = Key[upper];
+        } else {
+            unmapped.push(keyName);
+        }
+    }
+}
+console.log("Unmapped:", unmapped);
