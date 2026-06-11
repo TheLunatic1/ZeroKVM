@@ -34,14 +34,8 @@ class WebRTCManager extends EventEmitter {
 
     this.socket.on('user-joined', (peer) => {
       console.log(`New user joined: ${peer.deviceName}`);
-      // The newly joined user will receive our offer because we were already here? 
-      // Actually, let the EXISTING users initiate the offer to the NEW user.
-      // So if someone joins, we initiate connection. Wait, in room-peers above, NEW user initiates to existing? 
-      // Let's standardise: EXISTING users initiate to NEW user.
-      // So room-peers doesn't initiate. 'user-joined' initiates!
-      
-      // I'll swap it: existing users create PC as initiator.
-      this.createPeerConnection(peer.id, peer.deviceName, true);
+      // The new user will initiate the offer to us, so we act as the receiver (isInitiator = false).
+      this.createPeerConnection(peer.id, peer.deviceName, false);
       this.updatePeersList();
     });
 
