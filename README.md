@@ -1,4 +1,4 @@
-# KVM Mesh 🌐🖱️
+# ZeroKVM 🌐🖱️
 
 An ultra-low latency, IP-agnostic KVM (Keyboard, Video, Mouse - *Video excluded by design*) and Clipboard sharing application. 
 
@@ -34,7 +34,7 @@ Deploying this to a new computer is incredibly easy thanks to the automated star
 ## 🎮 Usage Instructions
 
 1. Ensure the `start.bat` terminal windows are running in the background.
-2. Open the KVM Mesh UI on all computers.
+2. Open the ZeroKVM UI on all computers.
 3. Enter a unique **Device Name** for each computer (e.g., `Laptop`, `Main-PC`).
 4. Enter the **exact same Room Code** (e.g., `studio`) on all computers and click **Join Room**.
 5. Once connected, use the **Display Layout** section to map your setup. 

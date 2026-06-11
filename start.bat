@@ -1,7 +1,7 @@
 @echo off
-title KVM Mesh Launcher
+title ZeroKVM Launcher
 echo =========================================
-echo    KVM Mesh Application Initialization
+echo    ZeroKVM Application Initialization
 echo =========================================
 echo.
 
