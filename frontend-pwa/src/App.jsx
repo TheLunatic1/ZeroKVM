@@ -7,6 +7,7 @@ const coreSocket = io('http://localhost:4000');
 function App() {
   const [roomCode, setRoomCode] = useState('');
   const [deviceName, setDeviceName] = useState('PC-' + Math.floor(Math.random() * 1000));
+  const [signalingUrl, setSignalingUrl] = useState('http://localhost:3001');
   const [isConnected, setIsConnected] = useState(false);
   const [isRemoteControl, setIsRemoteControl] = useState(false);
   const [remoteTarget, setRemoteTarget] = useState(null);
@@ -57,8 +58,7 @@ function App() {
   }, []);
 
   const handleConnect = () => {
-    if (!roomCode || !deviceName) return;
-    const signalingUrl = 'http://localhost:3001'; 
+    if (!roomCode || !deviceName || !signalingUrl) return;
     coreSocket.emit('connect-to-room', { roomCode, deviceName, signalingUrl, edgeMapping });
   };
 
@@ -83,6 +83,15 @@ function App() {
             type="text" 
             value={deviceName} 
             onChange={e => setDeviceName(e.target.value)} 
+            disabled={isConnected}
+          />
+        </div>
+        <div className="input-group">
+          <label>Signaling Server URL</label>
+          <input 
+            type="text" 
+            value={signalingUrl} 
+            onChange={e => setSignalingUrl(e.target.value)} 
             disabled={isConnected}
           />
         </div>
