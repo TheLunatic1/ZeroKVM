@@ -7,7 +7,7 @@ const coreSocket = io('http://localhost:4000');
 function App() {
   const [roomCode, setRoomCode] = useState('');
   const [deviceName, setDeviceName] = useState('PC-' + Math.floor(Math.random() * 1000));
-  const [signalingUrl, setSignalingUrl] = useState('http://localhost:3001');
+  const [signalingUrl, setSignalingUrl] = useState('https://zerokvm-signal-server.onrender.com');
   const [isConnected, setIsConnected] = useState(false);
   const [isRemoteControl, setIsRemoteControl] = useState(false);
   const [remoteTarget, setRemoteTarget] = useState(null);
