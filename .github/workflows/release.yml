@@ -117,7 +117,8 @@ jobs:
         shell: bash
         run: |
           npm install -g node-gyp@9
-          export npm_config_node_gyp="$(npm root -g)/node-gyp/bin/node-gyp.js"
+          rm -rf node_modules/node-gyp
+          cp -R "$(npm root -g)/node-gyp" node_modules/node-gyp
           npx electron-builder --win -p never
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
