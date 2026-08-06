@@ -39,6 +39,6 @@
     "vite": "^8.0.12"
   },
   "overrides": {
-    "node-gyp": "latest"
+    "node-gyp": "^9.4.1"
   }
 }
