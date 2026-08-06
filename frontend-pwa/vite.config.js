@@ -13,6 +13,13 @@ export default defineConfig({
     electron([
       {
         entry: 'electron/main.js',
+        vite: {
+          build: {
+            rollupOptions: {
+              external: ['node-datachannel', 'uiohook-napi', '@nut-tree-fork/nut-js']
+            }
+          }
+        }
       },
     ]),
     renderer(),
