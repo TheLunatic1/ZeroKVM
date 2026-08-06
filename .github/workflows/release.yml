@@ -90,6 +90,14 @@ jobs:
           cache: 'npm'
           cache-dependency-path: 'frontend-pwa/package-lock.json'
 
+      - name: Install macOS Dependencies
+        if: matrix.os == 'macos-latest'
+        run: brew install python-setuptools || true
+
+      - name: Install Linux Dependencies
+        if: matrix.os == 'ubuntu-latest'
+        run: sudo apt-get update && sudo apt-get install -y libx11-dev libxtst-dev libxkbcommon-x11-dev libxkbfile-dev libxinerama-dev || true
+
       - name: Install Dependencies
         working-directory: ./frontend-pwa
         run: npm install
