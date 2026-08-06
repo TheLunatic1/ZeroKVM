@@ -77,7 +77,7 @@ jobs:
       contents: write
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-2019, macos-latest]
+        os: [ubuntu-latest, windows-latest, macos-latest]
 
     steps:
       - name: Checkout Code
@@ -91,7 +91,7 @@ jobs:
           cache-dependency-path: 'frontend-pwa/package-lock.json'
 
       - name: Setup MSVC (Windows)
-        if: matrix.os == 'windows-2019'
+        if: matrix.os == 'windows-latest'
         uses: ilammy/msvc-dev-cmd@v1
 
       - name: Install macOS Dependencies
@@ -111,7 +111,7 @@ jobs:
         run: npm run build
 
       - name: Package Windows Release
-        if: matrix.os == 'windows-2019'
+        if: matrix.os == 'windows-latest'
         working-directory: ./frontend-pwa
         run: npx electron-builder --win -p never
         env:
@@ -132,7 +132,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Publish to GitHub Releases (Windows)
-        if: matrix.os == 'windows-2019'
+        if: matrix.os == 'windows-latest'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ needs.prepare.outputs.tag }}
