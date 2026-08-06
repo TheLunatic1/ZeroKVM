@@ -102,6 +102,7 @@ jobs:
 
       - name: Install Dependencies
         working-directory: ./frontend-pwa
+        shell: bash
         run: |
           rm -f package-lock.json
           npm install
