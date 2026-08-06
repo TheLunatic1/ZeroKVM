@@ -98,6 +98,10 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         run: sudo apt-get update && sudo apt-get install -y libx11-dev libxtst-dev libxkbcommon-x11-dev libxkbfile-dev libxinerama-dev libxrandr-dev libxext-dev libxfixes-dev libxt-dev || true
 
+      - name: Configure Windows Dependencies
+        if: matrix.os == 'windows-latest'
+        run: npm config set msvs_version 2022
+
       - name: Install Dependencies
         working-directory: ./frontend-pwa
         run: npm install
