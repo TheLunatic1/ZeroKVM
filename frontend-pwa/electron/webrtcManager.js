@@ -66,7 +66,10 @@ class WebRTCManager extends EventEmitter {
   createPeerConnection(targetId, deviceName, isInitiator) {
     console.log(`Creating peer connection with ${deviceName} (Initiator: ${isInitiator})`);
     const pc = new nodeDataChannel.PeerConnection(`pc-${targetId}`, {
-      iceServers: ['stun:stun.l.google.com:19302']
+      iceServers: [
+        'stun:72.244.153.23:3478',
+        'turn:zero:kvm@72.244.153.23:3478'
+      ]
     });
 
     this.peers[targetId] = {

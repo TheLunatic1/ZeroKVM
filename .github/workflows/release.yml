@@ -1,0 +1,151 @@
+name: Release ZeroKVM
+
+# Triggers:
+#   1. Auto — on any push to main that touches frontend-pwa/package.json
+#              Reads version, creates tag if new, then builds + releases
+#   2. Manual — click "Run workflow" in GitHub Actions tab
+#              Specify a tag or leave blank to auto-detect from package.json
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'frontend-pwa/package.json'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to release (e.g. v1.0.0) — leave empty to use version in package.json'
+        required: false
+        type: string
+
+jobs:
+  # ── Job 1: Read version, create tag if new ───────────────────────────────────
+  prepare:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      tag:          ${{ steps.resolve.outputs.tag }}
+      should_build: ${{ steps.decide.outputs.should_build }}
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Read version from package.json
+        id: pkg
+        run: echo "version=$(jq -r .version frontend-pwa/package.json)" >> $GITHUB_OUTPUT
+
+      - name: Resolve target tag
+        id: resolve
+        run: |
+          if [ -n "${{ github.event.inputs.tag }}" ]; then
+            echo "tag=${{ github.event.inputs.tag }}" >> $GITHUB_OUTPUT
+          else
+            echo "tag=v${{ steps.pkg.outputs.version }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Check tag and decide whether to build
+        id: decide
+        run: |
+          TAG="${{ steps.resolve.outputs.tag }}"
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "ℹ️  Tag $TAG already exists."
+            if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+              echo "should_build=true" >> $GITHUB_OUTPUT
+            else
+              echo "should_build=false" >> $GITHUB_OUTPUT
+              echo "ℹ️  Version unchanged — skipping build."
+            fi
+          else
+            echo "✅ New version detected — creating tag $TAG"
+            git config user.name  "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git tag "$TAG"
+            git push origin "$TAG"
+            echo "should_build=true" >> $GITHUB_OUTPUT
+          fi
+
+  # ── Job 2: Build + publish on all platforms ───────────────────────────────────
+  build:
+    needs: prepare
+    if: needs.prepare.outputs.should_build == 'true'
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: write
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: 'frontend-pwa/package-lock.json'
+
+      - name: Install Dependencies
+        working-directory: ./frontend-pwa
+        run: npm install
+
+      - name: Build React App
+        working-directory: ./frontend-pwa
+        run: npm run build
+
+      - name: Package Windows Release
+        if: matrix.os == 'windows-latest'
+        working-directory: ./frontend-pwa
+        run: npx electron-builder --win -p never
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Package Linux Release
+        if: matrix.os == 'ubuntu-latest'
+        working-directory: ./frontend-pwa
+        run: npx electron-builder --linux -p never
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Package macOS Release
+        if: matrix.os == 'macos-latest'
+        working-directory: ./frontend-pwa
+        run: npx electron-builder --mac -p never
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish to GitHub Releases (Windows)
+        if: matrix.os == 'windows-latest'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.prepare.outputs.tag }}
+          generate_release_notes: true
+          files: |
+            frontend-pwa/dist/*.exe
+            frontend-pwa/dist/latest.yml
+
+      - name: Publish to GitHub Releases (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.prepare.outputs.tag }}
+          generate_release_notes: true
+          files: |
+            frontend-pwa/dist/*.AppImage
+            frontend-pwa/dist/latest-linux.yml
+
+      - name: Publish to GitHub Releases (macOS)
+        if: matrix.os == 'macos-latest'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.prepare.outputs.tag }}
+          generate_release_notes: true
+          files: |
+            frontend-pwa/dist/*.dmg
+            frontend-pwa/dist/*.zip
+            frontend-pwa/dist/latest-mac.yml

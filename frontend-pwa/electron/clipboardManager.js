@@ -75,17 +75,24 @@ class ClipboardManager {
       let bytesSent = 0;
 
       readStream.on('data', (chunk) => {
-        const base64Chunk = chunk.toString('base64');
-        const chunkMsg = JSON.stringify({ type: 'file-chunk', filename, data: base64Chunk });
+        // Send raw binary buffer instead of JSON for the chunk
+        // We prepend a header to identify the file chunk:
+        // [1 byte (type: 0 for file-chunk)] [4 bytes (filename length)] [filename string] [remaining bytes (data)]
+        const filenameBuffer = Buffer.from(filename, 'utf-8');
+        const headerBuffer = Buffer.alloc(5 + filenameBuffer.length);
+        headerBuffer.writeUInt8(0, 0); // 0 indicates a binary file chunk
+        headerBuffer.writeUInt32LE(filenameBuffer.length, 1);
+        filenameBuffer.copy(headerBuffer, 5);
+        
+        const packet = Buffer.concat([headerBuffer, chunk]);
         
         let shouldPause = false;
         
-        // Broadcast manually so we can check bufferedAmount
         for (const id in this.webrtcManager.peers) {
             const peer = this.webrtcManager.peers[id];
             if (peer.fileChannel && peer.fileChannel.isOpen()) {
-                peer.fileChannel.sendMessage(chunkMsg);
-                if (peer.fileChannel.bufferedAmount() > 5 * 1024 * 1024) { // If buffer > 5MB, pause
+                peer.fileChannel.sendMessageBinary(packet); // Using sendMessageBinary
+                if (peer.fileChannel.bufferedAmount() > 1024 * 1024 * 2) { // Pause at 2MB buffer
                     shouldPause = true;
                 }
             }
@@ -101,7 +108,7 @@ class ClipboardManager {
                 let canResume = true;
                 for (const id in this.webrtcManager.peers) {
                     const peer = this.webrtcManager.peers[id];
-                    if (peer.fileChannel && peer.fileChannel.isOpen() && peer.fileChannel.bufferedAmount() > 1024 * 1024) {
+                    if (peer.fileChannel && peer.fileChannel.isOpen() && peer.fileChannel.bufferedAmount() > 512 * 1024) {
                         canResume = false;
                     }
                 }
@@ -126,6 +133,27 @@ class ClipboardManager {
 
   async handleIncomingMessage(message, sourceId) {
     try {
+      if (Buffer.isBuffer(message) || message instanceof ArrayBuffer) {
+        // Binary message (file chunk)
+        const buffer = Buffer.isBuffer(message) ? message : Buffer.from(message);
+        const type = buffer.readUInt8(0);
+        if (type === 0) { // File chunk
+            const filenameLength = buffer.readUInt32LE(1);
+            const filename = buffer.toString('utf-8', 5, 5 + filenameLength);
+            const data = buffer.slice(5 + filenameLength);
+            
+            const fileInfo = this.receivingFiles[filename];
+            if (fileInfo) {
+              fileInfo.stream.write(data);
+              fileInfo.bytesReceived += data.length;
+              
+              const progress = Math.round((fileInfo.bytesReceived / fileInfo.totalSize) * 100);
+              this.localSocket.emit('transfer-status', { type: 'receiving', filename, progress });
+            }
+        }
+        return;
+      }
+
       const data = JSON.parse(message);
       
       if (data.type === 'clipboard-text') {
@@ -142,17 +170,6 @@ class ClipboardManager {
           bytesReceived: 0
         };
         console.log(`Receiving file metadata: ${data.filename} from ${sourceId}`);
-      }
-      else if (data.type === 'file-chunk') {
-        const fileInfo = this.receivingFiles[data.filename];
-        if (fileInfo) {
-          const buffer = Buffer.from(data.data, 'base64');
-          fileInfo.stream.write(buffer);
-          fileInfo.bytesReceived += buffer.length;
-          
-          const progress = Math.round((fileInfo.bytesReceived / fileInfo.totalSize) * 100);
-          this.localSocket.emit('transfer-status', { type: 'receiving', filename: data.filename, progress });
-        }
       }
       else if (data.type === 'file-end') {
         const fileInfo = this.receivingFiles[data.filename];

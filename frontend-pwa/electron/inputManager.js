@@ -20,6 +20,12 @@ class InputManager {
     this.justLocked = false;
     this.lockPoint = { x: 0, y: 0 };
     
+    // Throttling properties
+    this.pendingDeltaX = 0;
+    this.pendingDeltaY = 0;
+    this.lastSendTime = 0;
+    this.throttleInterval = 16; // ~60fps
+    
     this.webrtcManager.on('message', async (sourceId, channel, message) => {
       if (channel === 'input-channel') {
         try {
@@ -99,8 +105,17 @@ class InputManager {
         const deltaY = e.y - lockY;
 
         if (deltaX !== 0 || deltaY !== 0) {
-          const msg = JSON.stringify({ type: 'mousemove', dx: deltaX, dy: deltaY });
-          this.webrtcManager.sendInputMessage(this.activeRemoteTarget, msg);
+          this.pendingDeltaX += deltaX;
+          this.pendingDeltaY += deltaY;
+          
+          const now = Date.now();
+          if (now - this.lastSendTime >= this.throttleInterval) {
+            const msg = JSON.stringify({ type: 'mousemove', dx: this.pendingDeltaX, dy: this.pendingDeltaY });
+            this.webrtcManager.sendInputMessage(this.activeRemoteTarget, msg);
+            this.pendingDeltaX = 0;
+            this.pendingDeltaY = 0;
+            this.lastSendTime = now;
+          }
           
           this.justLocked = true;
           this.lockPoint = { x: lockX, y: lockY };

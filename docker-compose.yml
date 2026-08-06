@@ -1,0 +1,19 @@
+version: '3.8'
+services:
+  turn:
+    image: coturn/coturn
+    network_mode: "host"
+    command: >
+      -n --log-file=stdout
+      --min-port=49152 --max-port=65535
+      --realm=zerokvm.local
+      --user=zero:kvm
+      --listening-port=3478
+  signal:
+    image: node:18-alpine
+    working_dir: /app
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./signal-server:/app
+    command: sh -c "npm install express socket.io cors && node server.js"
