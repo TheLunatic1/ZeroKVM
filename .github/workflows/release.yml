@@ -114,6 +114,7 @@ jobs:
         run: npx electron-builder --win -p never
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GYP_MSVS_VERSION: "2022"
 
       - name: Package Linux Release
         if: matrix.os == 'ubuntu-latest'
