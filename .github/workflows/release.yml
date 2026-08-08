@@ -86,7 +86,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 26.7.0
+          node-version: 20
 
       - name: Setup MSVC (Windows)
         if: matrix.os == 'windows-latest'
@@ -103,8 +103,7 @@ jobs:
       - name: Install Dependencies
         working-directory: ./frontend-pwa
         shell: bash
-        run: |
-          npm install
+        run: npm install --legacy-peer-deps
 
       - name: Build React App
         working-directory: ./frontend-pwa
