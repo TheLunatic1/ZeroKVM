@@ -2,6 +2,28 @@ import React, { useState, useEffect } from 'react';
 import { ipcRenderer } from 'electron';
 import Draggable from 'react-draggable';
 import './App.css';
+
+const DraggablePeer = ({ peer, layout, updateLayout }) => {
+  const nodeRef = React.useRef(null);
+  const w = peer.bounds ? peer.bounds.width / 10 : 120;
+  const h = peer.bounds ? peer.bounds.height / 10 : 80;
+
+  return (
+    <Draggable 
+      nodeRef={nodeRef}
+      bounds="parent"
+      defaultPosition={layout[peer.id] || { x: 0, y: 0 }}
+      onStop={(e, data) => updateLayout(peer.id, data.x, data.y)}
+    >
+      <div ref={nodeRef} style={{ position: 'absolute', cursor: 'grab', width: `${w}px`, height: `${h}px`, background: 'rgba(56,239,125,0.2)', border: '2px solid #38ef7d', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', flexDirection: 'column' }}>
+        <strong>{peer.deviceName}</strong>
+        {peer.bounds && <small style={{fontSize: '0.7rem', opacity: 0.7}}>{peer.bounds.width}x{peer.bounds.height}</small>}
+        <small style={{fontSize: '0.6rem', opacity: 0.5}}>Drag me</small>
+      </div>
+    </Draggable>
+  );
+};
+
 function App() {
   const [roomCode, setRoomCode] = useState('');
   const [deviceName, setDeviceName] = useState('PC-' + Math.floor(Math.random() * 1000));
@@ -17,8 +39,11 @@ function App() {
 
   // Master's 2D layout map
   const [layout, setLayout] = useState({});
+  const [localBounds, setLocalBounds] = useState({ width: 1920, height: 1080 });
 
   useEffect(() => {
+    ipcRenderer.invoke('get-local-bounds').then(bounds => setLocalBounds(bounds));
+
     const handlePeersUpdated = (event, updatedPeers) => {
       setPeers(updatedPeers);
       const connectedCount = updatedPeers.filter(p => p.isConnected).length;
@@ -174,23 +199,21 @@ function App() {
                   <h2>Spatial Layout</h2>
                   <p className="subtitle">Drag the connected PCs to arrange them relative to your screen.</p>
                   
-                  <div className="spatial-canvas" style={{ width: '100%', height: '300px', background: 'rgba(0,0,0,0.3)', border: '1px solid #444', borderRadius: '12px', position: 'relative', overflow: 'hidden' }}>
-                    <div style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%, -50%)', width: '120px', height: '80px', background: 'linear-gradient(135deg, rgba(255,255,255,0.2), rgba(255,255,255,0.1))', border: '2px solid #3a7bd5', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 'bold' }}>
-                      {deviceName} (You)
+                  <div className="spatial-canvas" style={{ width: '100%', height: '400px', background: 'rgba(0,0,0,0.3)', border: '1px solid #444', borderRadius: '12px', position: 'relative', overflow: 'hidden' }}>
+                    {/* Master Display (Center) */}
+                    <div style={{ 
+                      position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%, -50%)', 
+                      width: `${localBounds.width / 10}px`, height: `${localBounds.height / 10}px`,
+                      background: 'linear-gradient(135deg, rgba(255,255,255,0.2), rgba(255,255,255,0.1))', 
+                      border: '2px solid #3a7bd5', borderRadius: '8px', 
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 'bold', flexDirection: 'column'
+                    }}>
+                      <span>{deviceName} (You)</span>
+                      <small style={{fontSize: '0.7rem', opacity: 0.7}}>{localBounds.width}x{localBounds.height}</small>
                     </div>
                     
                     {peers.map(p => (
-                      <Draggable 
-                        key={p.id}
-                        bounds="parent"
-                        defaultPosition={layout[p.id] || { x: 0, y: 0 }}
-                        onStop={(e, data) => updateLayout(p.id, data.x, data.y)}
-                      >
-                        <div style={{ position: 'absolute', cursor: 'grab', width: '120px', height: '80px', background: 'rgba(56,239,125,0.2)', border: '2px solid #38ef7d', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', flexDirection: 'column' }}>
-                          <strong>{p.deviceName}</strong>
-                          <small style={{fontSize: '0.7rem', opacity: 0.7}}>Drag me</small>
-                        </div>
-                      </Draggable>
+                      <DraggablePeer key={p.id} peer={p} layout={layout} updateLayout={updateLayout} />
                     ))}
                   </div>
                 </div>

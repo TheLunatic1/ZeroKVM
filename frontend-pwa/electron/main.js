@@ -169,3 +169,16 @@ ipcMain.on('update-edge-mapping', (event, edgeMapping) => {
     inputManager.setEdgeMapping(edgeMapping);
   }
 });
+
+ipcMain.handle('get-local-bounds', () => {
+  const { screen } = require('electron');
+  const displays = screen.getAllDisplays();
+  let l = 0, r = 0, t = 0, b = 0;
+  displays.forEach(d => {
+    if (d.bounds.x < l) l = d.bounds.x;
+    if (d.bounds.x + d.bounds.width > r) r = d.bounds.x + d.bounds.width;
+    if (d.bounds.y < t) t = d.bounds.y;
+    if (d.bounds.y + d.bounds.height > b) b = d.bounds.y + d.bounds.height;
+  });
+  return { width: r - l, height: b - t };
+});

@@ -128,9 +128,32 @@ class WebRTCManager extends EventEmitter {
 
     dc.onOpen(() => {
       console.log(`DataChannel ${label} opened with ${peer.deviceName}`);
+      if (label === 'input-channel') {
+        const { screen } = require('electron');
+        const displays = screen.getAllDisplays();
+        let l = 0, r = 0, t = 0, b = 0;
+        displays.forEach(d => {
+          if (d.bounds.x < l) l = d.bounds.x;
+          if (d.bounds.x + d.bounds.width > r) r = d.bounds.x + d.bounds.width;
+          if (d.bounds.y < t) t = d.bounds.y;
+          if (d.bounds.y + d.bounds.height > b) b = d.bounds.y + d.bounds.height;
+        });
+        const bounds = { width: r - l, height: b - t };
+        dc.sendMessage(JSON.stringify({ type: 'hello', bounds }));
+      }
     });
 
     dc.onMessage((msg) => {
+      if (label === 'input-channel') {
+        try {
+          const data = JSON.parse(msg);
+          if (data.type === 'hello' && data.bounds) {
+            peer.bounds = data.bounds;
+            this.updatePeersList();
+            return;
+          }
+        } catch (e) {}
+      }
       this.emit('message', targetId, label, msg);
     });
   }
@@ -150,7 +173,8 @@ class WebRTCManager extends EventEmitter {
     const peersList = Object.keys(this.peers).map(id => ({
       id,
       deviceName: this.peers[id].deviceName,
-      isConnected: this.peers[id].isConnected
+      isConnected: this.peers[id].isConnected,
+      bounds: this.peers[id].bounds || null
     }));
     this.localSocket.emit('peers-updated', peersList);
   }

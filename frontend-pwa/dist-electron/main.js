@@ -8924,7 +8924,7 @@ var require_webrtcManager = /* @__PURE__ */ __commonJSMin(((exports, module) => 
 	var io = require_cjs();
 	var nodeDataChannel = require("node-datachannel");
 	var EventEmitter = require("events");
-	var WebRTCManager = class extends EventEmitter {
+	var WebRTCManager$1 = class extends EventEmitter {
 		constructor(signalingUrl, roomCode, deviceName, localSocket) {
 			super();
 			this.signalingUrl = signalingUrl;
@@ -9010,8 +9010,35 @@ var require_webrtcManager = /* @__PURE__ */ __commonJSMin(((exports, module) => 
 			else if (label === "file-channel") peer.fileChannel = dc;
 			dc.onOpen(() => {
 				console.log(`DataChannel ${label} opened with ${peer.deviceName}`);
+				if (label === "input-channel") {
+					const { screen } = require("electron");
+					const displays = screen.getAllDisplays();
+					let l = 0, r = 0, t = 0, b = 0;
+					displays.forEach((d) => {
+						if (d.bounds.x < l) l = d.bounds.x;
+						if (d.bounds.x + d.bounds.width > r) r = d.bounds.x + d.bounds.width;
+						if (d.bounds.y < t) t = d.bounds.y;
+						if (d.bounds.y + d.bounds.height > b) b = d.bounds.y + d.bounds.height;
+					});
+					const bounds = {
+						width: r - l,
+						height: b - t
+					};
+					dc.sendMessage(JSON.stringify({
+						type: "hello",
+						bounds
+					}));
+				}
 			});
 			dc.onMessage((msg) => {
+				if (label === "input-channel") try {
+					const data = JSON.parse(msg);
+					if (data.type === "hello" && data.bounds) {
+						peer.bounds = data.bounds;
+						this.updatePeersList();
+						return;
+					}
+				} catch (e) {}
 				this.emit("message", targetId, label, msg);
 			});
 		}
@@ -9029,7 +9056,8 @@ var require_webrtcManager = /* @__PURE__ */ __commonJSMin(((exports, module) => 
 			const peersList = Object.keys(this.peers).map((id) => ({
 				id,
 				deviceName: this.peers[id].deviceName,
-				isConnected: this.peers[id].isConnected
+				isConnected: this.peers[id].isConnected,
+				bounds: this.peers[id].bounds || null
 			}));
 			this.localSocket.emit("peers-updated", peersList);
 		}
@@ -9051,7 +9079,7 @@ var require_webrtcManager = /* @__PURE__ */ __commonJSMin(((exports, module) => 
 			for (const id in this.peers) this.removePeer(id);
 		}
 	};
-	module.exports = WebRTCManager;
+	module.exports = WebRTCManager$1;
 }));
 //#endregion
 //#region electron/keyboardMapper.js
@@ -9787,5 +9815,20 @@ ipcMain.on("connect-to-room", (event, { roomCode, deviceName, signalingUrl, edge
 });
 ipcMain.on("update-edge-mapping", (event, edgeMapping) => {
 	if (inputManager) inputManager.setEdgeMapping(edgeMapping);
+});
+ipcMain.handle("get-local-bounds", () => {
+	const { screen } = require("electron");
+	const displays = screen.getAllDisplays();
+	let l = 0, r = 0, t = 0, b = 0;
+	displays.forEach((d) => {
+		if (d.bounds.x < l) l = d.bounds.x;
+		if (d.bounds.x + d.bounds.width > r) r = d.bounds.x + d.bounds.width;
+		if (d.bounds.y < t) t = d.bounds.y;
+		if (d.bounds.y + d.bounds.height > b) b = d.bounds.y + d.bounds.height;
+	});
+	return {
+		width: r - l,
+		height: b - t
+	};
 });
 //#endregion
