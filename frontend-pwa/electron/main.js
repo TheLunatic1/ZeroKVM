@@ -107,6 +107,12 @@ function createCaptureWindow() {
       inputManager.setPaused(isPaused);
     }
   });
+
+  ipcMain.on('stop-remote-control', () => {
+    if (inputManager) {
+      inputManager.exitRemoteMode();
+    }
+  });
 }
 
 let overlayWindow = null;

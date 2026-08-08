@@ -49,6 +49,13 @@ class InputManager {
         } catch (err) {}
       }
     });
+
+    this.webrtcManager.on('peer-removed', (targetId) => {
+      if (this.activeRemoteTarget === targetId) {
+        console.log(`Active remote target ${targetId} disconnected, exiting remote mode.`);
+        this.exitRemoteMode();
+      }
+    });
   }
 
   async getVirtualScreen() {
@@ -91,16 +98,18 @@ class InputManager {
       // If we are currently being controlled by a remote PC, ignore all local physical mouse movements
       if (this.controlledBy) return;
 
-      if (!this.activeRemoteTarget) {
-        // Local control mode
-        let crossedEdge = null;
-        if (e.x >= this.screenBounds.right - 2 && this.edgeMapping.right) crossedEdge = 'right';
-        if (e.x <= this.screenBounds.left + 1 && this.edgeMapping.left) crossedEdge = 'left';
-        if (e.y <= this.screenBounds.top + 1 && this.edgeMapping.top) crossedEdge = 'top';
-        if (e.y >= this.screenBounds.bottom - 2 && this.edgeMapping.bottom) crossedEdge = 'bottom';
-        
-        if (crossedEdge) {
-          const targetId = this.edgeMapping[crossedEdge];
+        if (!this.activeRemoteTarget) {
+          // Local control mode
+          let crossedEdge = null;
+          const masterMapping = this.edgeMapping['master'] || {};
+          
+          if (e.x >= this.screenBounds.right - 2 && masterMapping.right) crossedEdge = 'right';
+          if (e.x <= this.screenBounds.left + 1 && masterMapping.left) crossedEdge = 'left';
+          if (e.y <= this.screenBounds.top + 1 && masterMapping.top) crossedEdge = 'top';
+          if (e.y >= this.screenBounds.bottom - 2 && masterMapping.bottom) crossedEdge = 'bottom';
+          
+          if (crossedEdge) {
+            const targetId = masterMapping[crossedEdge];
           if (this.webrtcManager.peers[targetId] && this.webrtcManager.peers[targetId].isConnected) {
             console.log(`Edge ${crossedEdge} crossed! Controlling peer ${targetId}`);
             this.activeRemoteTarget = targetId;
@@ -209,11 +218,22 @@ class InputManager {
     }
     else if (data.type === 'edge-hit') {
        console.log(`Remote mouse hit edge: ${data.edge}`);
-       // If the remote mouse hit the edge that connects back to us, we exit!
-       if (this.activeEdge === 'right' && data.edge === 'left') this.exitRemoteMode();
-       if (this.activeEdge === 'left' && data.edge === 'right') this.exitRemoteMode();
-       if (this.activeEdge === 'top' && data.edge === 'bottom') this.exitRemoteMode();
-       if (this.activeEdge === 'bottom' && data.edge === 'top') this.exitRemoteMode();
+       
+       const currentTarget = this.activeRemoteTarget;
+       const nextTarget = this.edgeMapping[currentTarget]?.[data.edge];
+       
+       if (nextTarget) {
+           if (nextTarget === 'master') {
+               this.exitRemoteMode(); // Returns to master
+           } else {
+               // Jump from one peer to another!
+               this.webrtcManager.sendInputMessage(currentTarget, JSON.stringify({ type: 'drop-control' }));
+               this.activeRemoteTarget = nextTarget;
+               this.activeEdge = data.edge; // Keep track of the entry direction
+               this.localSocket.emit('remote-status', { active: true, target: this.webrtcManager.peers[nextTarget].deviceName });
+               this.webrtcManager.sendInputMessage(nextTarget, JSON.stringify({ type: 'take-control', enterEdge: data.edge }));
+           }
+       }
     }
     else if (this.controlledBy === sourceId) {
        this.injectInput(data);

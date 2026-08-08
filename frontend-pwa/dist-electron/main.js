@@ -9050,6 +9050,7 @@ var require_webrtcManager = /* @__PURE__ */ __commonJSMin(((exports, module) => 
 				if (peer.pc) peer.pc.close();
 				delete this.peers[targetId];
 				this.updatePeersList();
+				this.emit("peer-removed", targetId);
 			}
 		}
 		updatePeersList() {
@@ -9261,6 +9262,12 @@ var require_inputManager = /* @__PURE__ */ __commonJSMin(((exports, module) => {
 					this.handleRemoteMessage(sourceId, data);
 				} catch (err) {}
 			});
+			this.webrtcManager.on("peer-removed", (targetId) => {
+				if (this.activeRemoteTarget === targetId) {
+					console.log(`Active remote target ${targetId} disconnected, exiting remote mode.`);
+					this.exitRemoteMode();
+				}
+			});
 		}
 		async getVirtualScreen() {
 			try {
@@ -9297,12 +9304,13 @@ var require_inputManager = /* @__PURE__ */ __commonJSMin(((exports, module) => {
 				if (this.controlledBy) return;
 				if (!this.activeRemoteTarget) {
 					let crossedEdge = null;
-					if (e.x >= this.screenBounds.right - 2 && this.edgeMapping.right) crossedEdge = "right";
-					if (e.x <= this.screenBounds.left + 1 && this.edgeMapping.left) crossedEdge = "left";
-					if (e.y <= this.screenBounds.top + 1 && this.edgeMapping.top) crossedEdge = "top";
-					if (e.y >= this.screenBounds.bottom - 2 && this.edgeMapping.bottom) crossedEdge = "bottom";
+					const masterMapping = this.edgeMapping["master"] || {};
+					if (e.x >= this.screenBounds.right - 2 && masterMapping.right) crossedEdge = "right";
+					if (e.x <= this.screenBounds.left + 1 && masterMapping.left) crossedEdge = "left";
+					if (e.y <= this.screenBounds.top + 1 && masterMapping.top) crossedEdge = "top";
+					if (e.y >= this.screenBounds.bottom - 2 && masterMapping.bottom) crossedEdge = "bottom";
 					if (crossedEdge) {
-						const targetId = this.edgeMapping[crossedEdge];
+						const targetId = masterMapping[crossedEdge];
 						if (this.webrtcManager.peers[targetId] && this.webrtcManager.peers[targetId].isConnected) {
 							console.log(`Edge ${crossedEdge} crossed! Controlling peer ${targetId}`);
 							this.activeRemoteTarget = targetId;
@@ -9387,10 +9395,24 @@ var require_inputManager = /* @__PURE__ */ __commonJSMin(((exports, module) => {
 				}
 			} else if (data.type === "edge-hit") {
 				console.log(`Remote mouse hit edge: ${data.edge}`);
-				if (this.activeEdge === "right" && data.edge === "left") this.exitRemoteMode();
-				if (this.activeEdge === "left" && data.edge === "right") this.exitRemoteMode();
-				if (this.activeEdge === "top" && data.edge === "bottom") this.exitRemoteMode();
-				if (this.activeEdge === "bottom" && data.edge === "top") this.exitRemoteMode();
+				const currentTarget = this.activeRemoteTarget;
+				const nextTarget = this.edgeMapping[currentTarget]?.[data.edge];
+				if (nextTarget) {
+					if (nextTarget === "master") this.exitRemoteMode();
+					else {
+						this.webrtcManager.sendInputMessage(currentTarget, JSON.stringify({ type: "drop-control" }));
+						this.activeRemoteTarget = nextTarget;
+						this.activeEdge = data.edge;
+						this.localSocket.emit("remote-status", {
+							active: true,
+							target: this.webrtcManager.peers[nextTarget].deviceName
+						});
+						this.webrtcManager.sendInputMessage(nextTarget, JSON.stringify({
+							type: "take-control",
+							enterEdge: data.edge
+						}));
+					}
+				}
 			} else if (this.controlledBy === sourceId) this.injectInput(data);
 		}
 		async injectInput(data) {
@@ -9765,6 +9787,9 @@ function createCaptureWindow() {
 	});
 	ipcMain.on("set-pause-state", (event, isPaused) => {
 		if (inputManager) inputManager.setPaused(isPaused);
+	});
+	ipcMain.on("stop-remote-control", () => {
+		if (inputManager) inputManager.exitRemoteMode();
 	});
 }
 var overlayWindow = null;

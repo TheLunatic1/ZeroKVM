@@ -166,6 +166,7 @@ class WebRTCManager extends EventEmitter {
       if (peer.pc) peer.pc.close();
       delete this.peers[targetId];
       this.updatePeersList();
+      this.emit('peer-removed', targetId);
     }
   }
 
