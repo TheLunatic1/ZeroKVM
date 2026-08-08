@@ -200,10 +200,13 @@ class InputManager {
       let startX = (this.screenBounds.left + this.screenBounds.right) / 2;
       let startY = (this.screenBounds.top + this.screenBounds.bottom) / 2;
       
-      if (data.enterEdge === 'right') startX = this.screenBounds.left + 2;
-      if (data.enterEdge === 'left') startX = this.screenBounds.right - 2;
-      if (data.enterEdge === 'bottom') startY = this.screenBounds.top + 2;
-      if (data.enterEdge === 'top') startY = this.screenBounds.bottom - 2;
+      if (data.enterEdge === 'right') startX = this.screenBounds.left + 15;
+      if (data.enterEdge === 'left') startX = this.screenBounds.right - 15;
+      if (data.enterEdge === 'bottom') startY = this.screenBounds.top + 15;
+      if (data.enterEdge === 'top') startY = this.screenBounds.bottom - 15;
+      
+      this.virtualX = startX;
+      this.virtualY = startY;
       
       await mouse.setPosition(new Point(startX, startY));
     }
@@ -242,16 +245,26 @@ class InputManager {
 
   async injectInput(data) {
     if (data.type === 'mousemove') {
-      const currentPos = await mouse.getPosition();
+      if (this.virtualX === undefined || this.virtualY === undefined) {
+        const currentPos = await mouse.getPosition();
+        this.virtualX = currentPos.x;
+        this.virtualY = currentPos.y;
+      }
       
-      let targetX = currentPos.x + data.dx;
-      let targetY = currentPos.y + data.dy;
+      this.virtualX += data.dx;
+      this.virtualY += data.dy;
+      
+      let targetX = this.virtualX;
+      let targetY = this.virtualY;
       
       let hitEdge = null;
       if (targetX <= this.screenBounds.left) { targetX = this.screenBounds.left; hitEdge = 'left'; }
-      if (targetX >= this.screenBounds.right - 2) { targetX = this.screenBounds.right - 2; hitEdge = 'right'; }
+      if (targetX >= this.screenBounds.right - 1) { targetX = this.screenBounds.right - 1; hitEdge = 'right'; }
       if (targetY <= this.screenBounds.top) { targetY = this.screenBounds.top; hitEdge = 'top'; }
-      if (targetY >= this.screenBounds.bottom - 2) { targetY = this.screenBounds.bottom - 2; hitEdge = 'bottom'; }
+      if (targetY >= this.screenBounds.bottom - 1) { targetY = this.screenBounds.bottom - 1; hitEdge = 'bottom'; }
+      
+      this.virtualX = targetX;
+      this.virtualY = targetY;
       
       await mouse.setPosition(new Point(targetX, targetY));
       
@@ -317,6 +330,7 @@ class InputManager {
 
   exitRemoteMode() {
     console.log('Exiting remote control mode.');
+    console.trace();
     if (this.activeRemoteTarget) {
        this.webrtcManager.sendInputMessage(this.activeRemoteTarget, JSON.stringify({ type: 'drop-control' }));
     }

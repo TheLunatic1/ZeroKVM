@@ -17,6 +17,7 @@
     const { ipcRenderer } = require('electron');
     
     let isLocked = false;
+    let lockTime = 0;
 
     // Automatically request pointer lock when focused/clicked
     function requestLock() {
@@ -33,6 +34,7 @@
     document.addEventListener('pointerlockchange', () => {
       if (document.pointerLockElement === document.body) {
         isLocked = true;
+        lockTime = Date.now();
         ipcRenderer.send('capture-pointer-locked');
       } else {
         isLocked = false;
@@ -42,6 +44,16 @@
 
     document.addEventListener('mousemove', (e) => {
       if (isLocked) {
+        // Ignore all movements for 250ms after locking to swallow OS cursor snaps
+        if (Date.now() - lockTime < 250) {
+          return;
+        }
+        
+        // Filter out any other impossible spikes
+        if (Math.abs(e.movementX) > 400 || Math.abs(e.movementY) > 400) {
+          return;
+        }
+
         ipcRenderer.send('capture-mousemove', { dx: e.movementX, dy: e.movementY });
       }
     });
