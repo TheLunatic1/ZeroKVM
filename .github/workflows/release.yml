@@ -104,7 +104,6 @@ jobs:
         working-directory: ./frontend-pwa
         shell: bash
         run: |
-          rm -f package-lock.json
           npm install
 
       - name: Build React App
