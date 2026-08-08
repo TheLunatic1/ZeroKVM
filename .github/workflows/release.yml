@@ -10,11 +10,11 @@ on:
     branches:
       - main
     paths:
-      - 'frontend-pwa/package.json'
+      - "frontend-pwa/package.json"
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Tag to release (e.g. v1.0.0) — leave empty to use version in package.json'
+        description: "Tag to release (e.g. v1.0.0) — leave empty to use version in package.json"
         required: false
         type: string
 
@@ -25,7 +25,7 @@ jobs:
     permissions:
       contents: write
     outputs:
-      tag:          ${{ steps.resolve.outputs.tag }}
+      tag: ${{ steps.resolve.outputs.tag }}
       should_build: ${{ steps.decide.outputs.should_build }}
 
     steps:
@@ -86,7 +86,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 26.7.0
 
       - name: Setup MSVC (Windows)
         if: matrix.os == 'windows-latest'
