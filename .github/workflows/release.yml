@@ -114,7 +114,7 @@ jobs:
         if: matrix.os == 'windows-latest'
         working-directory: ./frontend-pwa
         shell: bash
-          npx electron-builder --win -p never
+        run: npx electron-builder --win -p never
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
