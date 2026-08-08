@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ipcRenderer } from 'electron';
+import Draggable from 'react-draggable';
 import './App.css';
 function App() {
   const [roomCode, setRoomCode] = useState('');
@@ -9,15 +10,13 @@ function App() {
   const [isRemoteControl, setIsRemoteControl] = useState(false);
   const [remoteTarget, setRemoteTarget] = useState(null);
   
-  const [peers, setPeers] = useState([]); // [{id, deviceName, isConnected}]
+  const [role, setRole] = useState('master');
+  const [isPaused, setIsPaused] = useState(false);
+  const [peers, setPeers] = useState([]); // [{id, deviceName, isConnected, bounds}]
   const [transfer, setTransfer] = useState(null); 
 
-  const [edgeMapping, setEdgeMapping] = useState({
-    left: '',
-    right: '',
-    top: '',
-    bottom: ''
-  });
+  // Master's 2D layout map
+  const [layout, setLayout] = useState({});
 
   useEffect(() => {
     const handlePeersUpdated = (event, updatedPeers) => {
@@ -55,13 +54,33 @@ function App() {
 
   const handleConnect = () => {
     if (!roomCode || !deviceName || !signalingUrl) return;
-    ipcRenderer.send('connect-to-room', { roomCode, deviceName, signalingUrl, edgeMapping });
+    const bounds = { width: window.screen.width, height: window.screen.height };
+    ipcRenderer.send('connect-to-room', { roomCode, deviceName, signalingUrl, edgeMapping: {}, layout, role, bounds });
   };
 
-  const handleEdgeChange = (edge, targetId) => {
-    const newMapping = { ...edgeMapping, [edge]: targetId };
-    setEdgeMapping(newMapping);
-    ipcRenderer.send('update-edge-mapping', newMapping);
+  const togglePause = () => {
+    setIsPaused(!isPaused);
+    ipcRenderer.send('set-pause-state', !isPaused);
+  };
+
+  const updateLayout = (id, x, y) => {
+    const newLayout = { ...layout, [id]: { x, y } };
+    setLayout(newLayout);
+    ipcRenderer.send('update-layout', newLayout);
+    
+    // Convert 2D coordinates into 4-way edge mapping
+    const newEdgeMapping = { left: '', right: '', top: '', bottom: '' };
+    Object.entries(newLayout).forEach(([peerId, pos]) => {
+      // Basic quadrant detection relative to center (0,0)
+      if (Math.abs(pos.x) > Math.abs(pos.y)) {
+        if (pos.x < -40) newEdgeMapping.left = peerId;
+        else if (pos.x > 40) newEdgeMapping.right = peerId;
+      } else {
+        if (pos.y < -30) newEdgeMapping.top = peerId;
+        else if (pos.y > 30) newEdgeMapping.bottom = peerId;
+      }
+    });
+    ipcRenderer.send('update-edge-mapping', newEdgeMapping);
   };
 
   return (
@@ -74,7 +93,16 @@ function App() {
       <div className="main-content">
         <div className="left-column">
           <div className="card">
-            <h2>Connection</h2>
+            <h2>Connection Settings</h2>
+            
+            <div className="input-group">
+              <label>Role</label>
+              <select value={role} onChange={e => setRole(e.target.value)} disabled={isConnected}>
+                <option value="master">Master (Controller)</option>
+                <option value="worker">Worker (Controlled)</option>
+              </select>
+            </div>
+
             <div className="input-group">
               <label>Your Device Name</label>
               <input 
@@ -112,6 +140,16 @@ function App() {
               {isConnected ? 'Joined Room' : 'Join Room'}
             </button>
 
+            {role === 'master' && (
+              <button 
+                className={`connect-btn ${isPaused ? 'paused' : 'active-btn'}`}
+                onClick={togglePause}
+                style={{ marginTop: '10px', background: isPaused ? '#ff4b2b' : '' }}
+              >
+                {isPaused ? '▶ Resume Control' : '⏸ Pause Control'}
+              </button>
+            )}
+
             <div className="status-bar">
               <span className={`status-indicator ${isConnected ? 'connected' : ''}`}></span>
               <span>Peers connected: {peers.filter(p => p.isConnected).length}</span>
@@ -120,59 +158,49 @@ function App() {
         </div>
 
         <div className="right-column">
-          <div className={`card remote-control-card ${isRemoteControl ? 'active' : ''}`}>
-            <h2>Remote Control Mode</h2>
-            {isRemoteControl ? (
-              <p className="active-text">ACTIVE: Controlling {remoteTarget}</p>
-            ) : (
-              <p>Move mouse off the screen edges to take control.</p>
-            )}
-          </div>
-
-          {peers.length > 0 && (
-            <div className="card">
-              <h2>Display Layout</h2>
-              <p className="subtitle">Select which PC is on each side of this screen.</p>
-              
-              <div className="layout-grid">
-                <div className="edge-select top">
-                  <label>Top</label>
-                  <select value={edgeMapping.top} onChange={e => handleEdgeChange('top', e.target.value)}>
-                    <option value="">None</option>
-                    {peers.map(p => <option key={p.id} value={p.id}>{p.deviceName}</option>)}
-                  </select>
-                </div>
-                
-                <div className="layout-middle">
-                  <div className="edge-select left">
-                    <label>Left</label>
-                    <select value={edgeMapping.left} onChange={e => handleEdgeChange('left', e.target.value)}>
-                      <option value="">None</option>
-                      {peers.map(p => <option key={p.id} value={p.id}>{p.deviceName}</option>)}
-                    </select>
-                  </div>
-                  
-                  <div className="center-monitor">
-                    {deviceName}
-                  </div>
-                  
-                  <div className="edge-select right">
-                    <label>Right</label>
-                    <select value={edgeMapping.right} onChange={e => handleEdgeChange('right', e.target.value)}>
-                      <option value="">None</option>
-                      {peers.map(p => <option key={p.id} value={p.id}>{p.deviceName}</option>)}
-                    </select>
-                  </div>
-                </div>
-                
-                <div className="edge-select bottom">
-                  <label>Bottom</label>
-                  <select value={edgeMapping.bottom} onChange={e => handleEdgeChange('bottom', e.target.value)}>
-                    <option value="">None</option>
-                    {peers.map(p => <option key={p.id} value={p.id}>{p.deviceName}</option>)}
-                  </select>
-                </div>
+          {role === 'master' ? (
+            <>
+              <div className={`card remote-control-card ${isRemoteControl ? 'active' : ''}`}>
+                <h2>Remote Control Mode</h2>
+                {isRemoteControl ? (
+                  <p className="active-text">ACTIVE: Controlling {remoteTarget}</p>
+                ) : (
+                  <p>{isPaused ? 'Control paused.' : 'Move mouse off the screen edges to take control.'}</p>
+                )}
               </div>
+
+              {peers.length > 0 && (
+                <div className="card layout-card">
+                  <h2>Spatial Layout</h2>
+                  <p className="subtitle">Drag the connected PCs to arrange them relative to your screen.</p>
+                  
+                  <div className="spatial-canvas" style={{ width: '100%', height: '300px', background: 'rgba(0,0,0,0.3)', border: '1px solid #444', borderRadius: '12px', position: 'relative', overflow: 'hidden' }}>
+                    <div style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%, -50%)', width: '120px', height: '80px', background: 'linear-gradient(135deg, rgba(255,255,255,0.2), rgba(255,255,255,0.1))', border: '2px solid #3a7bd5', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 'bold' }}>
+                      {deviceName} (You)
+                    </div>
+                    
+                    {peers.map(p => (
+                      <Draggable 
+                        key={p.id}
+                        bounds="parent"
+                        defaultPosition={layout[p.id] || { x: 0, y: 0 }}
+                        onStop={(e, data) => updateLayout(p.id, data.x, data.y)}
+                      >
+                        <div style={{ position: 'absolute', cursor: 'grab', width: '120px', height: '80px', background: 'rgba(56,239,125,0.2)', border: '2px solid #38ef7d', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', flexDirection: 'column' }}>
+                          <strong>{p.deviceName}</strong>
+                          <small style={{fontSize: '0.7rem', opacity: 0.7}}>Drag me</small>
+                        </div>
+                      </Draggable>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="card">
+              <h2>Worker Mode</h2>
+              <p>This PC is acting as a Worker. The Master PC will automatically handle layout and screen configuration.</p>
+              <p>Your physical mouse and keyboard will be temporarily disabled while the Master is controlling this PC.</p>
             </div>
           )}
 

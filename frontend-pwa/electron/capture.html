@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      background: rgba(0, 0, 0, 0.01); /* Almost transparent but captures clicks */
+      width: 100vw;
+      height: 100vh;
+      cursor: none;
+    }
+  </style>
+</head>
+<body>
+  <script>
+    const { ipcRenderer } = require('electron');
+    
+    let isLocked = false;
+
+    // Automatically request pointer lock when focused/clicked
+    function requestLock() {
+      if (!isLocked) {
+        document.body.requestPointerLock();
+      }
+    }
+
+    document.body.addEventListener('mousedown', requestLock);
+    
+    // Also try immediately (might require user interaction first though)
+    requestLock();
+
+    document.addEventListener('pointerlockchange', () => {
+      if (document.pointerLockElement === document.body) {
+        isLocked = true;
+        ipcRenderer.send('capture-pointer-locked');
+      } else {
+        isLocked = false;
+        ipcRenderer.send('capture-pointer-unlocked');
+      }
+    });
+
+    document.addEventListener('mousemove', (e) => {
+      if (isLocked) {
+        ipcRenderer.send('capture-mousemove', { dx: e.movementX, dy: e.movementY });
+      }
+    });
+
+    document.addEventListener('mousedown', e => {
+      if (isLocked) ipcRenderer.send('capture-mousedown', { button: e.button });
+    });
+
+    document.addEventListener('mouseup', e => {
+      if (isLocked) ipcRenderer.send('capture-mouseup', { button: e.button });
+    });
+
+    document.addEventListener('keydown', e => {
+      e.preventDefault();
+      // Use native nut.js keycodes mapping based on JS e.code or e.key later
+      if (isLocked) ipcRenderer.send('capture-keydown', { code: e.code, key: e.key, keyCode: e.keyCode });
+    });
+
+    document.addEventListener('keyup', e => {
+      e.preventDefault();
+      if (isLocked) ipcRenderer.send('capture-keyup', { code: e.code, key: e.key, keyCode: e.keyCode });
+    });
+
+    document.addEventListener('wheel', e => {
+      if (isLocked) ipcRenderer.send('capture-wheel', { deltaY: e.deltaY });
+    });
+
+    // Listen for commands from main process
+    ipcRenderer.on('start-capture', () => {
+      requestLock();
+    });
+
+    ipcRenderer.on('stop-capture', () => {
+      document.exitPointerLock();
+    });
+  </script>
+</body>
+</html>

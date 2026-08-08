@@ -15,15 +15,20 @@
       "**/*",
       "dist",
       "dist-electron"
-    ]
+    ],
+    "win": {
+      "requestedExecutionLevel": "requireAdministrator"
+    }
   },
   "dependencies": {
     "@nut-tree-fork/nut-js": "^4.2.6",
     "cors": "^2.8.6",
     "express": "^5.2.1",
+    "koffi": "^3.1.4",
     "node-datachannel": "^0.32.3",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
+    "react-draggable": "^4.7.1",
     "socket.io": "^4.8.3",
     "socket.io-client": "^4.8.3",
     "uiohook-napi": "^1.5.5",

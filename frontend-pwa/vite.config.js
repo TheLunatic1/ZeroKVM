@@ -17,7 +17,7 @@ export default defineConfig({
         vite: {
           build: {
             rollupOptions: {
-              external: ['node-datachannel', 'uiohook-napi', '@nut-tree-fork/nut-js']
+              external: ['node-datachannel', 'uiohook-napi', '@nut-tree-fork/nut-js', 'koffi']
             }
           }
         }
