@@ -3,9 +3,6 @@ import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 import electron from 'vite-plugin-electron'
 import renderer from 'vite-plugin-electron-renderer'
-import { createRequire } from 'module';
-
-const require = createRequire(import.meta.url);
 
 export default defineConfig({
   base: './',
@@ -47,4 +44,3 @@ export default defineConfig({
     })
   ]
 });
-
